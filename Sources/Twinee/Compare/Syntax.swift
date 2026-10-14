@@ -380,7 +380,12 @@ enum SyntaxHighlighter {
                     add(i, j, .directive)
                     let directive = String(decoding: chars[i..<j], as: UTF16.self)
                     if directive.hasPrefix("#include") || directive.hasPrefix("#import"), let open = nextNonSpace(j), open == 60, let lt = (j..<n).first(where: { chars[$0] == 60 }) {
-                        let gt = (lt..<n).first(where: { chars[$0] == 62 }).map { $0 + 1 } ?? n
+                        let gt: Int
+                        if let close = (lt..<n).first(where: { chars[$0] == 62 }) {
+                            gt = close + 1
+                        } else {
+                            gt = n
+                        }
                         add(lt, gt, .string)
                         j = gt
                     }
