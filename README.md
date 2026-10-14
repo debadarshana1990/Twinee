@@ -48,6 +48,10 @@ Only bypass Gatekeeper if you trust the source of the download. A Developer ID s
 
 Twinee does not upload or sync your content. Workspace data is stored at `~/Library/Application Support/Twinee/workspace.json`; developer-app settings and history are stored alongside it in `devtools.json`. Back up this folder yourself. Removing the app does not remove your saved data.
 
+## License
+
+Twinee is released under the [MIT License](LICENSE). You may use, modify, and redistribute it, including commercially, while retaining the copyright and license notice.
+
 ## Build from source
 
 Requirements: macOS 13 or later, Xcode Command Line Tools, and Swift 5.9 or newer. There are no third-party package dependencies.
