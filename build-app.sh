@@ -22,12 +22,14 @@ if [ ! -f "$ROOT_DIR/Resources/AppIcon.icns" ]; then
 fi
 
 echo "Building universal binary..."
-swift build --package-path "$ROOT_DIR" --configuration release --arch arm64 --arch x86_64
-BIN_DIR="$(swift build --package-path "$ROOT_DIR" --configuration release --arch arm64 --arch x86_64 --show-bin-path)"
+# Per-architecture builds, then lipo: the combined --arch build trips over SwiftTerm's build plugin on CI.
+for ARCH in arm64 x86_64; do
+    swift build --package-path "$ROOT_DIR" --configuration release --arch "$ARCH" --build-path "$ROOT_DIR/.build-$ARCH"
+done
 
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
-cp "$BIN_DIR/Twinee" "$APP_DIR/Contents/MacOS/Twinee"
+lipo -create "$ROOT_DIR/.build-arm64/release/Twinee" "$ROOT_DIR/.build-x86_64/release/Twinee" -output "$APP_DIR/Contents/MacOS/Twinee"
 cp "$ROOT_DIR/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 cp "$ROOT_DIR/LICENSE" "$APP_DIR/Contents/Resources/LICENSE.txt"
 
