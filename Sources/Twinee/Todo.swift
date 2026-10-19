@@ -42,7 +42,6 @@ enum TodoStatus: String, Codable, CaseIterable, Identifiable {
 
 struct TodoItem: Identifiable, Codable, Equatable {
     var id: UUID = UUID()
-    var projectID: UUID
     var title: String
     var status: TodoStatus = .bucket
     var notes: String?
@@ -52,46 +51,64 @@ struct TodoItem: Identifiable, Codable, Equatable {
 
 enum TodoScope: Hashable {
     case all
-    case project(UUID)
+}
+
+protocol TodoSource: ObservableObject {
+    var todos: [TodoItem] { get }
+    func addTodo(_ title: String)
+    func moveTodo(_ id: UUID, to status: TodoStatus)
+    func updateTodoTitle(_ id: UUID, _ title: String)
+    func updateTodoNotes(_ id: UUID, _ notes: String)
+    func deleteTodo(_ id: UUID)
+}
+
+extension WorkspaceStore: TodoSource {}
+
+// The board that belongs to one TableSpoon topic or subtopic, kept in a .todo file inside its folder.
+final class TSTodoList: ObservableObject, TodoSource {
+    @Published private(set) var todos: [TodoItem] = []
+    private let url: URL
+
+    init(url: URL) {
+        self.url = url
+        if let data = try? Data(contentsOf: url), let saved = try? JSONDecoder.twinee.decode([TodoItem].self, from: data) { todos = saved }
+    }
+
+    private func persist() { try? JSONEncoder.twinee.encode(todos).write(to: url, options: .atomic) }
+
+    func addTodo(_ title: String) { todos.append(TodoItem(title: title)); persist() }
+
+    func moveTodo(_ id: UUID, to status: TodoStatus) {
+        guard let i = todos.firstIndex(where: { $0.id == id }), todos[i].status != status else { return }
+        withAnimation(.easeInOut(duration: 0.18)) { todos[i].status = status; todos[i].updatedAt = Date() }
+        persist()
+    }
+
+    func updateTodoTitle(_ id: UUID, _ title: String) {
+        guard let i = todos.firstIndex(where: { $0.id == id }) else { return }
+        todos[i].title = title; persist()
+    }
+
+    func updateTodoNotes(_ id: UUID, _ notes: String) {
+        guard let i = todos.firstIndex(where: { $0.id == id }) else { return }
+        todos[i].notes = notes.isEmpty ? nil : notes; persist()
+    }
+
+    func deleteTodo(_ id: UUID) {
+        withAnimation(.easeInOut(duration: 0.18)) { todos.removeAll { $0.id == id } }
+        persist()
+    }
 }
 
 extension WorkspaceStore {
-    func renameProject(id: UUID, name: String) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let index = projects.firstIndex(where: { $0.id == id }) else { return }
-        projects[index].name = trimmed
-        persist()
+    func openTodo() {
+        todoScope = .all
     }
 
-    // Removes the project together with its topics and tasks, then moves the selection somewhere valid.
-    func deleteProject(id: UUID) {
-        topics.removeAll { $0.projectID == id }
-        todos.removeAll { $0.projectID == id }
-        projects.removeAll { $0.id == id }
-        WhiteboardStore.shared.remove(key: id.uuidString)
-        if whiteboardProjectID == id { whiteboardProjectID = nil; activeApp = nil }
+    var openTodoCount: Int { todos.filter { $0.status != .done }.count }
 
-        let topicRemoved = selectedTopicID.map { selected in !topics.contains { $0.id == selected } } ?? false
-        var scopeRemoved = false
-        if case .project(let scopeID) = todoScope, scopeID == id { scopeRemoved = true }
-        if selectedProjectID == id { selectedProjectID = projects.first?.id }
-        if topicRemoved { selectedTopicID = nil }
-        if topicRemoved || scopeRemoved { todoScope = projects.first.map { TodoScope.project($0.id) } }
-        persist()
-    }
-
-    func openTodo(_ scope: TodoScope) {
-        todoScope = scope
-        selectedTopicID = nil
-        if case .project(let id) = scope { selectedProjectID = id }
-    }
-
-    func openTodoCount(for projectID: UUID?) -> Int {
-        todos.filter { $0.status != .done && (projectID == nil || $0.projectID == projectID) }.count
-    }
-
-    func addTodo(_ title: String, projectID: UUID) {
-        todos.append(TodoItem(projectID: projectID, title: title))
+    func addTodo(_ title: String) {
+        todos.append(TodoItem(title: title))
         persist()
     }
 
@@ -121,50 +138,28 @@ extension WorkspaceStore {
         persist()
     }
 
-    func setTodoNotes(_ data: Data, for projectID: UUID) {
-        guard let index = projects.firstIndex(where: { $0.id == projectID }) else { return }
-        projects[index].todoNotes = data.isEmpty ? nil : data
-        persist()
-    }
 }
 
-struct TodoBoard: View {
-    @ObservedObject var store: WorkspaceStore
-    let scope: TodoScope
+struct TodoBoard<Store: TodoSource>: View {
+    @ObservedObject var store: Store
+    var crumb = "ToDo"
+    var title = "All tasks"
+    var embedded = false
     let palette: Palette
     let theme: ThemeMode
     let toggleTheme: () -> Void
     @State private var newTitle = ""
-    @State private var targetProjectID: UUID?
     @State private var dropTarget: TodoStatus?
-    @State private var notesExpanded = true
-    @StateObject private var notesEditor = EditorController()
 
-    private var scopedProject: Project? {
-        guard case .project(let id) = scope else { return nil }
-        return store.projects.first { $0.id == id }
-    }
-
-    private var scopedTodos: [TodoItem] {
-        switch scope {
-        case .all: return store.todos
-        case .project(let id): return store.todos.filter { $0.projectID == id }
-        }
-    }
-
-    private var addProjectID: UUID? { scopedProject?.id ?? targetProjectID ?? store.selectedProjectID ?? store.projects.first?.id }
+    private var scopedTodos: [TodoItem] { store.todos }
 
     private func items(_ status: TodoStatus) -> [TodoItem] {
         scopedTodos.filter { $0.status == status }.sorted { $0.updatedAt > $1.updatedAt }
     }
 
-    private func color(for projectID: UUID) -> Color {
-        ProjectPalette.color(store.projects.firstIndex { $0.id == projectID } ?? 0)
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            topBar
+            if !embedded { topBar }
             VStack(alignment: .leading, spacing: 18) {
                 header
                 addRow
@@ -172,7 +167,6 @@ struct TodoBoard: View {
                     ForEach(TodoStatus.allCases) { status in column(status) }
                 }
                 .frame(maxHeight: .infinity)
-                if let project = scopedProject { notesBox(project) }
             }
             .frame(maxWidth: 1120, maxHeight: .infinity, alignment: .topLeading)
             .padding(.horizontal, 34).padding(.top, 24).padding(.bottom, 20)
@@ -185,9 +179,9 @@ struct TodoBoard: View {
 
     private var topBar: some View {
         HStack(spacing: 8) {
-            Text("ToDo").foregroundStyle(palette.muted)
+            Text(crumb).foregroundStyle(palette.muted)
             Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold)).foregroundStyle(palette.muted.opacity(0.65))
-            Text(scopedProject?.name ?? "All tasks").fontWeight(.medium).lineLimit(1)
+            Text(title).fontWeight(.medium).lineLimit(1)
             Spacer()
             Picker("Theme", selection: Binding(get: { theme }, set: { _ in toggleTheme() })) {
                 Text("White").tag(ThemeMode.white)
@@ -205,8 +199,8 @@ struct TodoBoard: View {
         let done = scopedTodos.filter { $0.status == .done }.count
         return HStack(alignment: .bottom, spacing: 16) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(scopedProject == nil ? "EVERY PROJECT, ONE PLACE" : "PROJECT TODO").font(.system(size: 9, weight: .bold)).tracking(1.3).foregroundStyle(palette.accent)
-                Text(scopedProject?.name ?? "All tasks").font(.system(size: 28, weight: .bold, design: .rounded)).tracking(-0.8).lineLimit(1)
+                Text(crumb == "ToDo" ? "EVERYTHING TO DO, ONE PLACE" : "TASKS FOR THIS TOPIC").font(.system(size: 9, weight: .bold)).tracking(1.3).foregroundStyle(palette.accent)
+                Text(title).font(.system(size: 28, weight: .bold, design: .rounded)).tracking(-0.8).lineLimit(1)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
@@ -226,13 +220,8 @@ struct TodoBoard: View {
             Image(systemName: "plus.circle.fill").font(.system(size: 15)).foregroundStyle(palette.accent)
             TextField("Add a task to Bucket and press Return…", text: $newTitle)
                 .textFieldStyle(.plain).font(.system(size: 12)).onSubmit(addTask)
-            if scopedProject == nil, !store.projects.isEmpty {
-                Picker("Project", selection: Binding(get: { addProjectID }, set: { targetProjectID = $0 })) {
-                    ForEach(store.projects) { Text($0.name).tag(Optional($0.id)) }
-                }.labelsHidden().frame(width: 160)
-            }
             Button("Add", action: addTask).buttonStyle(.borderedProminent).tint(palette.accent)
-                .disabled(newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || addProjectID == nil)
+                .disabled(newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(.horizontal, 14).padding(.vertical, 9)
         .background(palette.surface, in: RoundedRectangle(cornerRadius: 10))
@@ -241,8 +230,8 @@ struct TodoBoard: View {
 
     private func addTask() {
         let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty, let projectID = addProjectID else { return }
-        store.addTodo(title, projectID: projectID)
+        guard !title.isEmpty else { return }
+        store.addTodo(title)
         newTitle = ""
     }
 
@@ -304,12 +293,6 @@ struct TodoBoard: View {
                 TextField("Task", text: Binding(get: { item.title }, set: { store.updateTodoTitle(item.id, $0) }), axis: .vertical)
                     .textFieldStyle(.plain).font(.system(size: 12, weight: .medium)).lineLimit(1...5)
                     .strikethrough(isDone).foregroundStyle(isDone ? palette.muted : palette.text)
-                if scopedProject == nil, let project = store.projects.first(where: { $0.id == item.projectID }) {
-                    HStack(spacing: 5) {
-                        Circle().fill(color(for: project.id)).frame(width: 5, height: 5)
-                        Text(project.name).font(.system(size: 9)).foregroundStyle(palette.muted).lineLimit(1)
-                    }
-                }
                 TextField("Add a note…", text: Binding(get: { item.notes ?? "" }, set: { store.updateTodoNotes(item.id, $0) }), axis: .vertical)
                     .textFieldStyle(.plain).font(.system(size: 10)).lineLimit(2...6)
                     .foregroundStyle(palette.muted)
@@ -333,63 +316,5 @@ struct TodoBoard: View {
         .background(palette.background, in: RoundedRectangle(cornerRadius: 9))
         .overlay(RoundedRectangle(cornerRadius: 9).stroke(palette.border, lineWidth: 1))
         .onDrag { NSItemProvider(object: item.id.uuidString as NSString) }
-    }
-
-    private func notesBox(_ project: Project) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button { withAnimation(.easeInOut(duration: 0.15)) { notesExpanded.toggle() } } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: notesExpanded ? "chevron.down" : "chevron.right").font(.system(size: 8, weight: .bold)).foregroundStyle(palette.muted).frame(width: 10)
-                    Image(systemName: "note.text").font(.system(size: 12)).foregroundStyle(palette.accent)
-                    Text("Notes").font(.system(size: 12, weight: .semibold))
-                    Text("Free space for anything about \(project.name)").font(.system(size: 10)).foregroundStyle(palette.muted).lineLimit(1)
-                    Spacer()
-                }.contentShape(Rectangle())
-            }.buttonStyle(.plain)
-            if notesExpanded {
-                FormatBar(editor: notesEditor, palette: palette, showsTip: false)
-                TodoNotes(project: project, store: store, controller: notesEditor)
-                    .frame(height: 140)
-                    .padding(.horizontal, 14).padding(.vertical, 8)
-                    .background(palette.surface, in: RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(palette.border, lineWidth: 1))
-            }
-        }
-    }
-}
-
-private struct TodoNotes: View {
-    let project: Project
-    let store: WorkspaceStore
-    let controller: EditorController
-    @State private var data: Data
-    @State private var saveTask: DispatchWorkItem?
-
-    init(project: Project, store: WorkspaceStore, controller: EditorController) {
-        self.project = project
-        self.store = store
-        self.controller = controller
-        _data = State(initialValue: project.todoNotes ?? Data())
-    }
-
-    var body: some View {
-        RichTextEditor(data: $data, controller: controller)
-            .onChange(of: data) { updated in
-                saveTask?.cancel()
-                let task = DispatchWorkItem { store.setTodoNotes(updated, for: project.id) }
-                saveTask = task
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: task)
-            }
-            .onDisappear {
-                guard saveTask != nil else { return }
-                saveTask?.cancel()
-                store.setTodoNotes(data, for: project.id)
-            }
-    }
-}
-
-enum ProjectPalette {
-    static func color(_ index: Int) -> Color {
-        [Color(hex: 0x7C5CFF), Color(hex: 0xFF8A3D), Color(hex: 0x1FB57A), Color(hex: 0x2F8CFF), Color(hex: 0xFF4F8B)][index % 5]
     }
 }

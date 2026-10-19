@@ -21,7 +21,6 @@ final class TimerModel: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var cyclesDone = 0
     @Published var label = ""
-    @Published var projectID: UUID?
     @Published var banner: String?
 
     private let tools = DevToolsStore.shared
@@ -161,7 +160,7 @@ final class TimerModel: ObservableObject {
 
     private func record(seconds: Int, start: Date) {
         let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        tools.sessions.insert(FocusSession(label: trimmed, projectID: projectID, start: start, seconds: seconds), at: 0)
+        tools.sessions.insert(FocusSession(label: trimmed, start: start, seconds: seconds), at: 0)
         if tools.sessions.count > 500 { tools.sessions = Array(tools.sessions.prefix(500)) }
     }
 }
@@ -169,7 +168,6 @@ final class TimerModel: ObservableObject {
 struct TimerView: View {
     @ObservedObject var model: TimerModel
     @ObservedObject private var tools = DevToolsStore.shared
-    let projects: [Project]
     let palette: Palette
     let theme: ThemeMode
     let toggleTheme: () -> Void
@@ -239,10 +237,6 @@ struct TimerView: View {
 
             HStack(spacing: 10) {
                 TextField("What are you working on?", text: $model.label).textFieldStyle(.roundedBorder)
-                Picker("Project", selection: $model.projectID) {
-                    Text("No project").tag(UUID?.none)
-                    ForEach(projects) { Text($0.name).tag(UUID?.some($0.id)) }
-                }.labelsHidden().frame(width: 170)
             }.font(.system(size: 11))
 
             if let banner = model.banner {
@@ -296,7 +290,6 @@ struct TimerView: View {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(Color(hex: 0x58A486))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(session.label.isEmpty ? "Focus session" : session.label).font(.system(size: 11, weight: .medium)).lineLimit(1)
-                        Text(projects.first { $0.id == session.projectID }?.name ?? "No project").font(.system(size: 9)).foregroundStyle(palette.muted)
                     }
                     Spacer()
                     Text(minutes(session.seconds)).font(.system(size: 11, weight: .medium))

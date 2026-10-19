@@ -1,12 +1,13 @@
 import SwiftUI
 
 enum DevApp: String, CaseIterable, Identifiable {
-    case whiteboard, compare, code, git, timer, launcher
+    case tablespoon, whiteboard, compare, code, git, timer, launcher
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .tablespoon: return "TableSpoon"
         case .whiteboard: return "Whiteboard"
         case .compare: return "Compare"
         case .code: return "Code Browser"
@@ -18,6 +19,7 @@ enum DevApp: String, CaseIterable, Identifiable {
 
     var tint: Color {
         switch self {
+        case .tablespoon: return Color(hex: 0xFF7A3D)
         case .whiteboard: return Color(hex: 0xE8517E)
         case .compare: return Color(hex: 0x2F9BD8)
         case .code: return Color(hex: 0x37B26C)
@@ -29,6 +31,7 @@ enum DevApp: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
+        case .tablespoon: return "fork.knife"
         case .whiteboard: return "scribble.variable"
         case .compare: return "arrow.left.arrow.right.square"
         case .code: return "chevron.left.forwardslash.chevron.right"
@@ -57,7 +60,6 @@ struct LauncherApp: Codable, Identifiable, Equatable {
 struct FocusSession: Codable, Identifiable, Equatable {
     var id = UUID()
     var label: String
-    var projectID: UUID?
     var start: Date
     var seconds: Int
 }
@@ -148,19 +150,7 @@ final class DevToolsStore: ObservableObject {
 
 extension WorkspaceStore {
     func openApp(_ app: DevApp) {
-        whiteboardProjectID = nil
         todoScope = nil
-        selectedTopicID = nil
         activeApp = app
-    }
-}
-
-extension WorkspaceStore {
-    func openWhiteboard(for projectID: UUID) {
-        todoScope = nil
-        selectedTopicID = nil
-        selectedProjectID = projectID
-        whiteboardProjectID = projectID
-        activeApp = .whiteboard
     }
 }

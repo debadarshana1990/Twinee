@@ -15,11 +15,11 @@
 
 ## What is this?
 
-Twinee is a local-first Mac app that started as "somewhere to put a thought" and, through a series of increasingly ambitious prompts, now holds your notes, tasks, whiteboards, code, diffs and a focus timer. No account, no cloud, no subscription — just a SwiftUI app and a lot of sticky notes.
+Twinee is a local-first Mac app that started as "somewhere to put a thought" and, through a series of increasingly ambitious prompts, now holds your study topics, notes, tasks, whiteboards, code, diffs and a focus timer. No account, no cloud, no subscription — just a SwiftUI app and a lot of sticky notes.
 
 ## Download and install
 
-Grab **Twinee-3.0.0.dmg** from [Releases](https://github.com/debadarshana1990/Twinee/releases), open it, drag Twinee to Applications. Universal build: Apple silicon and Intel, macOS 13+.
+Grab **Twinee-4.0.0.dmg** from [Releases](https://github.com/debadarshana1990/Twinee/releases), open it, drag Twinee to Applications. Universal build: Apple silicon and Intel, macOS 13+.
 
 It's **ad-hoc signed, not notarized** (Apple wants $99/year to be told I'm trustworthy). On first launch:
 
@@ -31,19 +31,21 @@ Only do this if you trust where the download came from.
 
 ## What's inside
 
-### 📝 Pages (Confluence-ish, not Notepad-ish)
-- Projects with pages nested under them; rename and delete from the sidebar.
-- Wiki layout: title, byline with word count, labels, link field, project/type pickers.
-- Rich editor: H1–H3, bold/italic/underline, lists, links, syntax-highlighted code blocks (type ```` ``` ````).
-- **Insert menu**: Info/Note/Success/Warning/Error panels, status tags, dividers.
-- **On this page** outline, and a full-width toggle.
-- **Sticky notes** (light red, blue or green): drag, resize, recolour.
-
 ### 🖍️ Whiteboards
-A global one plus one per project. Pen, eraser, colours, width, undo.
+A single global board. Pen, eraser, colours, width, undo.
 
 ### ✅ ToDo
-Per-project **Bucket → Ongoing → Done** boards, plus an All-tasks view.
+One **Bucket → Ongoing → Done** board.
+
+### 🍴 TableSpoon
+A study workspace in the sidebar. Make a **Topic** (e.g. "C++ Memory Management"), nest **Subtopics** under it as deep as you like (right-click any topic or subtopic and choose "New subtopic inside…"), and put **Notes**, dated **Journal** pages and experiment **Code** files in each.
+- **Notes and journal pages are Confluence-style rich pages**: headings, lists, links, code blocks, info/note/warning panels, status tags and an "On this page" outline.
+- Editable code with syntax highlighting, line numbers, auto-indent, Cmd-click go-to-definition and find usages.
+- **A real terminal** running your own login shell (`$SHELL -l`), so every compiler or tool on your Mac works. **Build & Run** (⌘↵) types the right command for C/C++, Swift, Rust, Go, Python, JS, Java or shell into it; **Stop** sends Ctrl-C.
+- Autosaves to `~/Library/Application Support/Twinee/TableSpoon`. Pages are `.page` files (RTF); older Markdown notes convert automatically.
+- Optional per-topic **Whiteboard** and **ToDo** boards: use the sidebar buttons or right-click a topic/subtopic → "Add whiteboard" / "Add ToDo board". They are stored as `.board` / `.todo` files in that topic's folder.
+- **Bookmarks and tags**: star a page (or right-click → Bookmark) to pin it in a BOOKMARKS list at the top of the sidebar; add tags with the tag button or right-click → Add tag. The sidebar search matches names and tags (`#pointers`), and tag chips filter with one click. Stored in `.tablespoon-meta.json`.
+- The AI panel sees the file you have open.
 
 ### 🔎 Code Browser
 - **Open from Git**: paste a URL, choose a branch, browse — no repository to create.
@@ -73,7 +75,7 @@ Requirements: macOS 13 or later, Xcode Command Line Tools, and Swift 5.9 or newe
 
 From the repository root:
 
-- `bash build-app.sh` builds a universal `dist/Twinee.app`, a drag-to-Applications `dist/Twinee-3.0.0.dmg`, and a ZIP archive.
+- `bash build-app.sh` builds a universal `dist/Twinee.app`, a drag-to-Applications `dist/Twinee-4.0.0.dmg`, and a ZIP archive.
 - `VERSION=3.0.1 bash build-app.sh` sets the bundle version and artifact names.
 - `swift run` builds and launches the app for development.
 - `swift scripts/make-icon.swift` regenerates `Resources/AppIcon.icns`.
@@ -82,11 +84,11 @@ The build script compiles arm64 and x86_64 slices, assembles the `.app` bundle, 
 
 ## Release infrastructure
 
-Pushing a version tag such as `v3.0.0` runs [the release workflow](.github/workflows/release.yml) on a macOS GitHub Actions runner. It builds the universal app and attaches the DMG and ZIP to a GitHub release using [RELEASE_NOTES.md](RELEASE_NOTES.md). To cut a release:
+Pushing a version tag such as `v4.0.0` runs [the release workflow](.github/workflows/release.yml) on a macOS GitHub Actions runner. It builds the universal app and attaches the DMG and ZIP to a GitHub release using [RELEASE_NOTES.md](RELEASE_NOTES.md). To cut a release:
 
 1. Build and verify the app locally with `bash build-app.sh`.
 2. Commit the source, packaging script, icon, and workflow.
-3. Create and push the tag: `git tag v3.0.0 && git push origin main v3.0.0`.
+3. Create and push the tag: `git tag v4.0.0 && git push origin main v4.0.0`.
 4. GitHub Actions builds the downloadable artifacts and publishes the release.
 
 The automated GitHub build uses ad-hoc signing too, so it has the same first-launch Gatekeeper notice. The DMG/ZIP are generated by the workflow and attached to the release; they are not committed to the source repository.

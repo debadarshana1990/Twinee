@@ -9,42 +9,33 @@
 
 ---
 
-# Twinee 3.0.0 — "Now with 100% more sticky notes"
+# Twinee 4.0.0 — "TableSpoon: a study app that fits in a spoon"
 
-The last release was a candidate. This one is a *decision*. 🎉
+3.0.0 had Projects. 4.0.0 asked: *what if Projects, but for people who actually want to learn something?* 🥄
 
-### 📝 Pages grew up
-Pages are now wiki-style (hello, Confluence cosplay):
-- Big title, colour strip, byline with word count, project/type pickers, link field and **label chips**.
-- **Insert menu**: Info / Note / Success / Warning / Error panels, status tags (TO DO, IN PROGRESS, DONE, BLOCKED, IN REVIEW) and dividers.
-- **"On this page" outline** that jumps to your headings.
-- Readable column or full-window width — your call.
-- **Sticky notes** in light red, light blue or light green. Drag, resize, recolour, regret.
-- Rename and delete pages from the sidebar (yes, that was broken before; we don't talk about it).
+### 🍴 TableSpoon replaces Projects
+Study "C++ Memory Management", split it into subtopics, split *those* into sub-subtopics, and keep going until you have a folder tree deeper than your understanding of `free()`.
+- **Topics and subtopics, nested forever.** Right-click → "New subtopic inside…".
+- **Confluence-style pages** for notes and journal entries: headings, panels, status tags, an outline. Not Markdown. Old Markdown notes migrate on their own.
+- **Code files with an editor**: syntax highlighting, line numbers, auto-indent, Cmd-click go-to-definition, find usages.
+- **A real terminal** running *your* login shell, so Build & Run (⌘↵) uses whatever compiler *you* installed. Segfaults are now first-class study material.
+- **Optional Whiteboard and ToDo per topic and subtopic.** Add one only if you want it; no board shaming.
+- **Bookmarks and tags.** Star a page and it floats to the top of the sidebar. Tag it `#pointers`, search `#pointers`, find your pointers. Pointers: found.
 
-### 🖍️ Whiteboards
-One global whiteboard and one per project. Pen, eraser, colours, undo. Picasso not included.
+### 🧹 Cleaned up
+- Projects, Pages and Sticky Notes are gone. They had a good run.
+- ToDo and Whiteboard are now global boards, plus the per-topic ones above.
+- Twinee opens straight on TableSpoon.
+- Existing workspaces still load; nothing of yours gets deleted.
 
-### 🔎 Code Browser, now with fewer excuses
-- **Open from Git**: paste a URL, pick a branch, read the code. No clone to manage, no repo list to tidy.
-- Opens **any text file**, not just C/C++/Python.
-- **HTML Preview** mode (scripts off, because trust issues).
-- **Notes on code lines**, saved per repository and shown in the gutter.
-
-### ✨ AI chat panel (⇧⌘I)
-A VS Code-style panel on the right that can read whatever page you have open. Pick GitHub Copilot, Gemini, Claude or Codex — whichever CLI you have installed.
-
-### 🪟 Interface
-- Resizable sidebars and an AI panel.
-- Collapse the sidebar for a full page; hover the left edge to peek.
-- Colour. So much colour.
-- **Help ▸ Twinee Help** now tells you the version, so you can report bugs against the right one.
+### 🙏 Third-party
+Terminal emulation by [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) (MIT).
 
 ---
 
 ## Install
 
-1. Download **Twinee-3.0.0.dmg** below, open it, drag Twinee to Applications.
+1. Download **Twinee-4.0.0.dmg** below, open it, drag Twinee to Applications.
 2. The app is **ad-hoc signed, not notarized**, so macOS will frown at it. Control-click → **Open**, or on macOS 15+ use **System Settings → Privacy & Security → Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/Twinee.app`.
 3. Only do that if you trust the source. Reading the warnings above counts as due diligence.
 

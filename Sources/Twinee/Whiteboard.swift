@@ -66,6 +66,7 @@ struct WhiteboardView: View {
     let palette: Palette
     let theme: ThemeMode
     let toggleTheme: () -> Void
+    var embedded = false
 
     @State private var strokes: [WBStroke]
     @State private var current: WBStroke?
@@ -78,7 +79,8 @@ struct WhiteboardView: View {
 
     private static let colors: [Int] = [-1, 0xD6453D, 0xE08A2E, 0x3E9B6F, 0x3F7FD1, 0x8875E2]
 
-    init(key: String, subtitle: String, palette: Palette, theme: ThemeMode, toggleTheme: @escaping () -> Void) {
+    init(key: String, subtitle: String, palette: Palette, theme: ThemeMode, toggleTheme: @escaping () -> Void, embedded: Bool = false) {
+        self.embedded = embedded
         self.key = key
         self.subtitle = subtitle
         self.palette = palette
@@ -93,7 +95,7 @@ struct WhiteboardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            AppTopBar(title: "Whiteboard", subtitle: subtitle, palette: palette, theme: theme, toggleTheme: toggleTheme)
+            if !embedded { AppTopBar(title: "Whiteboard", subtitle: subtitle, palette: palette, theme: theme, toggleTheme: toggleTheme) }
             toolbar
             board
         }

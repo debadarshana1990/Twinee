@@ -88,21 +88,6 @@ enum RichText {
         [.font: bodyFont, .foregroundColor: NSColor.labelColor, .paragraphStyle: baseParagraph]
     }
 
-    static func document(from sections: [TopicSection]) -> NSAttributedString {
-        let doc = NSMutableAttributedString()
-        for section in sections {
-            if !section.title.isEmpty {
-                var attrs = bodyAttributes
-                attrs[.font] = font(heading: 1)
-                doc.append(NSAttributedString(string: section.title + "\n", attributes: attrs))
-            }
-            if !section.content.isEmpty {
-                doc.append(NSAttributedString(string: section.content + "\n", attributes: bodyAttributes))
-            }
-        }
-        return doc
-    }
-
     // Colors are not stored so the text follows the White/Black theme.
     static func encode(_ attributed: NSAttributedString) -> Data {
         guard attributed.length > 0 else { return Data() }

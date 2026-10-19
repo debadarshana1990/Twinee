@@ -186,31 +186,3 @@ struct OutlineRail: View {
         .overlay(alignment: .leading) { Rectangle().fill(Brand.gradient).frame(width: 2) }
     }
 }
-
-struct LabelChips: View {
-    @Binding var labels: [String]
-    let palette: Palette
-    @State private var newLabel = ""
-
-    private func tint(_ label: String) -> Color { ProjectPalette.color(abs(label.hashValue) % 5) }
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "tag").font(.system(size: 10)).foregroundStyle(palette.muted)
-            ForEach(labels, id: \.self) { label in
-                HStack(spacing: 4) {
-                    Text(label).font(.system(size: 10, weight: .semibold))
-                    Button { labels.removeAll { $0 == label } } label: { Image(systemName: "xmark").font(.system(size: 7, weight: .bold)) }.buttonStyle(.plain)
-                }
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .foregroundStyle(tint(label)).background(tint(label).opacity(0.15), in: Capsule())
-            }
-            TextField("Add label", text: $newLabel).textFieldStyle(.plain).font(.system(size: 10)).frame(width: 80)
-                .onSubmit {
-                    let value = newLabel.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().replacingOccurrences(of: " ", with: "-")
-                    if !value.isEmpty, !labels.contains(value) { labels.append(value) }
-                    newLabel = ""
-                }
-        }
-    }
-}

@@ -7,7 +7,10 @@ let package = Package(
     products: [
         .executable(name: "Twinee", targets: ["Twinee"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.2.0"),
+    ],
     targets: [
-        .executableTarget(name: "Twinee"),
+        .executableTarget(name: "Twinee", dependencies: [.product(name: "SwiftTerm", package: "SwiftTerm")]),
     ]
 )
