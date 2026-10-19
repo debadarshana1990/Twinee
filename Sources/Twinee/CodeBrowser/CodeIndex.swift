@@ -1,13 +1,15 @@
 import SwiftUI
 
-enum SourceLanguage {
+enum SourceLanguage: Equatable {
     case c, cpp, python
+    case other(String)
 
     var specID: String {
         switch self {
         case .c: return "c"
         case .cpp: return "cpp"
         case .python: return "python"
+        case .other(let id): return id
         }
     }
 
@@ -16,6 +18,7 @@ enum SourceLanguage {
         case .c: return "C"
         case .cpp: return "C++"
         case .python: return "Python"
+        case .other(let id): return LanguageRegistry.spec(id: id)?.name ?? "Text"
         }
     }
 
@@ -26,6 +29,19 @@ enum SourceLanguage {
         case "py", "pyi": return .python
         default: return nil
         }
+    }
+
+    // Any file can be opened; languages without symbol indexing still get syntax colouring.
+    static func detect(path: String) -> SourceLanguage {
+        if let known = from(extension: (path as NSString).pathExtension) { return known }
+        let name = (path as NSString).lastPathComponent
+        let spec = LanguageRegistry.detect(fileNames: [name], samples: [])
+        return .other(spec.id)
+    }
+
+    var isIndexed: Bool {
+        if case .other = self { return false }
+        return true
     }
 }
 
@@ -95,6 +111,7 @@ struct CodeSymbol: Identifiable, Hashable {
 
 enum SymbolExtractor {
     static func extract(text: String, path: String, language: SourceLanguage) -> [CodeSymbol] {
+        guard language.isIndexed else { return [] }
         let lines = text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
         let spec = LanguageRegistry.spec(id: language.specID)!
         let spans = SyntaxHighlighter.highlight(lines: lines, spec: spec)
@@ -103,6 +120,7 @@ enum SymbolExtractor {
         switch language {
         case .python: symbols = python(code, original: lines, path: path)
         case .c, .cpp: symbols = cFamily(code, original: lines, path: path, cpp: language == .cpp)
+        case .other: symbols = []
         }
         symbols.sort { $0.line < $1.line }
         return symbols

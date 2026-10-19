@@ -25,6 +25,7 @@ final class CodeBrowserModel: ObservableObject {
         case files = "Files"
         case outline = "Outline"
         case symbols = "Symbols"
+        case notes = "Notes"
         var id: String { rawValue }
     }
 
@@ -45,12 +46,20 @@ final class CodeBrowserModel: ObservableObject {
     @Published var message: String?
     @Published private(set) var isSearching = false
 
+    @Published private(set) var remote: RemoteSource?
+    @Published var isFetchingRemote = false
+    @Published var remoteError: String?
+    @Published private(set) var remoteBranches: [String] = []
+    @Published private(set) var remoteDefaultBranch: String?
+    @Published private(set) var selectedLine = 0
+
     private var symbolsByFile: [String: [CodeSymbol]] = [:]
     private var symbolsByName: [String: [CodeSymbol]] = [:]
     private var generation = 0
 
     private static let skippedDirectories: Set<String> = ["node_modules", "build", "DerivedData", "__pycache__", "venv", "Pods", "dist", "target", "site-packages", "CMakeFiles"]
     private static let maxFiles = 5000
+    private static let binaryExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "bmp", "ico", "icns", "tiff", "webp", "heic", "pdf", "zip", "gz", "tgz", "bz2", "xz", "7z", "rar", "tar", "jar", "war", "o", "a", "so", "dylib", "dll", "exe", "class", "pyc", "pyo", "bin", "dmg", "iso", "mp3", "mp4", "mov", "avi", "mkv", "wav", "flac", "ogg", "ttf", "otf", "woff", "woff2", "eot", "sqlite", "db", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "lock", "DS_Store"]
     private static let maxIndexedBytes = 1_500_000
 
     var outline: [CodeSymbol] { currentPath.flatMap { symbolsByFile[$0] } ?? [] }
@@ -66,17 +75,34 @@ final class CodeBrowserModel: ObservableObject {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.message = "Choose a folder with C, C++ or Python source code"
+        panel.message = "Choose a folder to browse"
         panel.prompt = "Open"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         load(url)
     }
 
-    func load(_ url: URL) {
+    var displayName: String {
+        if let remote { return "\(GitModel.repoName(from: remote.url)) @ \(remote.branch)" }
+        return root?.lastPathComponent ?? ""
+    }
+
+    // Notes follow the repository (or folder), not the temporary checkout.
+    var sourceKey: String { remote.map { NoteSource.key(forRemote: $0.url) } ?? root?.path ?? "" }
+
+    func setSelectedLine(_ line: Int) { selectedLine = line }
+
+    func load(_ url: URL, remote: RemoteSource? = nil) {
         generation += 1
         let current = generation
         root = url
-        DevToolsStore.shared.codeFolder = url.path
+        self.remote = remote
+        if let remote {
+            DevToolsStore.shared.codeRemote = remote
+        } else {
+            DevToolsStore.shared.codeFolder = url.path
+            DevToolsStore.shared.codeRemote = nil
+        }
+        selectedLine = 0
         tree = []
         files = []
         symbols = []
@@ -129,7 +155,7 @@ final class CodeBrowserModel: ObservableObject {
                 if skippedDirectories.contains(entry.lastPathComponent) { continue }
                 let children = scan(entry, files: &files)
                 if !children.isEmpty { directories.append(FileNode(id: entry.path, name: entry.lastPathComponent, children: children)) }
-            } else if SourceLanguage.from(extension: entry.pathExtension) != nil, files.count < maxFiles {
+            } else if !binaryExtensions.contains(entry.pathExtension.lowercased()), files.count < maxFiles {
                 files.append(entry.path)
                 sources.append(FileNode(id: entry.path, name: entry.lastPathComponent, children: nil))
             }
@@ -137,10 +163,10 @@ final class CodeBrowserModel: ObservableObject {
         return directories + sources
     }
 
-    func isFile(_ path: String) -> Bool { SourceLanguage.from(extension: (path as NSString).pathExtension) != nil }
+    func isFile(_ path: String) -> Bool { !((try? URL(fileURLWithPath: path).resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false) }
 
     func open(path: String, line: Int? = nil) {
-        guard let language = SourceLanguage.from(extension: (path as NSString).pathExtension) else { return }
+        let language = SourceLanguage.detect(path: path)
         if path == currentPath {
             if let line { jump = LineJump(line: line) }
             return
@@ -250,6 +276,23 @@ final class CodeBrowserModel: ObservableObject {
 final class CodeTextView: NSTextView {
     var onDefinition: ((String) -> Void)?
     var onUsages: ((String) -> Void)?
+    var onAddNote: ((Int) -> Void)?
+    var onSelectionLine: ((Int) -> Void)?
+    var lineStarts: [Int] = [0]
+
+    func lineIndex(forCharacter location: Int) -> Int {
+        var low = 0, high = lineStarts.count - 1
+        while low < high {
+            let mid = (low + high + 1) / 2
+            if lineStarts[mid] <= location { low = mid } else { high = mid - 1 }
+        }
+        return low
+    }
+
+    override func setSelectedRange(_ charRange: NSRange, affinity: NSSelectionAffinity, stillSelecting stillSelectingFlag: Bool) {
+        super.setSelectedRange(charRange, affinity: affinity, stillSelecting: stillSelectingFlag)
+        if !stillSelectingFlag { onSelectionLine?(lineIndex(forCharacter: charRange.location)) }
+    }
 
     func word(at point: NSPoint) -> String? {
         let adjusted = NSPoint(x: point.x - textContainerInset.width, y: point.y - textContainerInset.height)
@@ -278,6 +321,14 @@ final class CodeTextView: NSTextView {
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = super.menu(for: event) ?? NSMenu()
+        if onAddNote != nil, !string.isEmpty {
+            let line = lineIndex(forCharacter: characterIndexForInsertion(at: convert(event.locationInWindow, from: nil)))
+            let note = NSMenuItem(title: "Add Note on Line \(line + 1)…", action: #selector(addNote(_:)), keyEquivalent: "")
+            note.tag = line
+            note.target = self
+            menu.insertItem(note, at: 0)
+            menu.insertItem(.separator(), at: 1)
+        }
         if let word = word(at: convert(event.locationInWindow, from: nil)) {
             let definition = NSMenuItem(title: "Go to Definition of “\(word)”", action: #selector(goDefinition(_:)), keyEquivalent: "")
             definition.representedObject = word
@@ -292,12 +343,14 @@ final class CodeTextView: NSTextView {
         return menu
     }
 
+    @objc private func addNote(_ sender: NSMenuItem) { onAddNote?(sender.tag) }
     @objc private func goDefinition(_ sender: NSMenuItem) { if let word = sender.representedObject as? String { onDefinition?(word) } }
     @objc private func findUsages(_ sender: NSMenuItem) { if let word = sender.representedObject as? String { onUsages?(word) } }
 }
 
 final class LineNumberRuler: NSRulerView {
     var lineStarts: [Int] = [0] { didSet { needsDisplay = true } }
+    var noteLines: Set<Int> = [] { didSet { needsDisplay = true } }
     private let labelFont = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular)
 
     init(scrollView: NSScrollView, textView: NSTextView) {
@@ -339,6 +392,10 @@ final class LineNumberRuler: NSRulerView {
             let label = "\(line + 1)" as NSString
             let size = label.size(withAttributes: attributes)
             label.draw(at: NSPoint(x: ruleThickness - size.width - 8, y: y + (fragment.height - size.height) / 2), withAttributes: attributes)
+            if noteLines.contains(line) {
+                NSColor.systemOrange.setFill()
+                NSBezierPath(ovalIn: NSRect(x: 6, y: y + fragment.height / 2 - 3, width: 6, height: 6)).fill()
+            }
             line += 1
         }
     }
@@ -350,6 +407,9 @@ struct CodeViewer: NSViewRepresentable {
     let jump: LineJump?
     let onDefinition: (String) -> Void
     let onUsages: (String) -> Void
+    var noteLines: Set<Int> = []
+    var onAddNote: ((Int) -> Void)?
+    var onSelectionLine: ((Int) -> Void)?
 
     final class Coordinator {
         var renderedText: String?
@@ -391,6 +451,9 @@ struct CodeViewer: NSViewRepresentable {
         let coordinator = context.coordinator
         tv.onDefinition = onDefinition
         tv.onUsages = onUsages
+        tv.onAddNote = onAddNote
+        tv.onSelectionLine = onSelectionLine
+        (scroll.verticalRulerView as? LineNumberRuler)?.noteLines = noteLines
 
         if coordinator.renderedText != text || coordinator.renderedLanguage != language {
             let rendered = Self.render(text, language: language)
@@ -398,6 +461,7 @@ struct CodeViewer: NSViewRepresentable {
             coordinator.renderedText = text
             coordinator.renderedLanguage = language
             coordinator.lineStarts = rendered.lineStarts
+            tv.lineStarts = rendered.lineStarts
             (scroll.verticalRulerView as? LineNumberRuler)?.lineStarts = rendered.lineStarts
             tv.scroll(NSPoint.zero)
         }
@@ -439,7 +503,7 @@ struct CodeViewer: NSViewRepresentable {
         let lines = normalized.components(separatedBy: "\n")
         var starts: [Int] = []
         var offset = 0
-        let spans = normalized.utf16.count > 800_000 ? nil : SyntaxHighlighter.highlight(lines: lines, spec: LanguageRegistry.spec(id: language.specID)!)
+        let spans = normalized.utf16.count > 800_000 ? nil : LanguageRegistry.spec(id: language.specID).map { SyntaxHighlighter.highlight(lines: lines, spec: $0) }
         let bold = NSFont.monospacedSystemFont(ofSize: 12, weight: .semibold)
         for (index, line) in lines.enumerated() {
             starts.append(offset)

@@ -328,10 +328,11 @@ final class EditorController: ObservableObject {
     }
 }
 
-struct FormatBar: View {
+struct FormatBar<Trailing: View>: View {
     let editor: EditorController
     let palette: Palette
     var showsTip = true
+    @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
         HStack(spacing: 3) {
@@ -355,6 +356,8 @@ struct FormatBar: View {
             } label: {
                 Image(systemName: "curlybraces").font(.system(size: 12, weight: .medium)).frame(width: 24, height: 24)
             }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help("Language for code highlighting")
+            divider
+            trailing()
             Spacer()
             if showsTip {
                 Text("Tip: type # for a heading, - for a bullet, ``` for code").font(.system(size: 9)).foregroundStyle(palette.muted)
@@ -381,6 +384,12 @@ struct FormatBar: View {
             Image(systemName: symbol).font(.system(size: 12, weight: .medium)).frame(width: 28, height: 24)
         }
         .buttonStyle(.plain).foregroundStyle(palette.text).help(help).keyboardShortcut(key, modifiers: modifiers)
+    }
+}
+
+extension FormatBar where Trailing == EmptyView {
+    init(editor: EditorController, palette: Palette, showsTip: Bool = true) {
+        self.init(editor: editor, palette: palette, showsTip: showsTip, trailing: { EmptyView() })
     }
 }
 

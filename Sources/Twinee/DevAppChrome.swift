@@ -21,8 +21,13 @@ struct AppTopBar: View {
         .font(.system(size: 10))
         .padding(.horizontal, 24).frame(height: 52)
         .background(palette.surface)
+        .overlay(alignment: .top) { Rectangle().fill(Brand.gradient).frame(height: 3) }
         .overlay(alignment: .bottom) { Rectangle().fill(palette.border).frame(height: 1) }
     }
+}
+
+enum Brand {
+    static let gradient = LinearGradient(colors: [Color(hex: 0x7C5CFF), Color(hex: 0xFF4F8B), Color(hex: 0xFF8A3D)], startPoint: .leading, endPoint: .trailing)
 }
 
 struct PillButtonStyle: ButtonStyle {

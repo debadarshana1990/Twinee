@@ -1,12 +1,13 @@
 import SwiftUI
 
 enum DevApp: String, CaseIterable, Identifiable {
-    case compare, code, git, timer, launcher
+    case whiteboard, compare, code, git, timer, launcher
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .whiteboard: return "Whiteboard"
         case .compare: return "Compare"
         case .code: return "Code Browser"
         case .git: return "Git Pull"
@@ -15,8 +16,20 @@ enum DevApp: String, CaseIterable, Identifiable {
         }
     }
 
+    var tint: Color {
+        switch self {
+        case .whiteboard: return Color(hex: 0xE8517E)
+        case .compare: return Color(hex: 0x2F9BD8)
+        case .code: return Color(hex: 0x37B26C)
+        case .git: return Color(hex: 0xF08A24)
+        case .timer: return Color(hex: 0xE5484D)
+        case .launcher: return Color(hex: 0x8E5CE6)
+        }
+    }
+
     var symbol: String {
         switch self {
+        case .whiteboard: return "scribble.variable"
         case .compare: return "arrow.left.arrow.right.square"
         case .code: return "chevron.left.forwardslash.chevron.right"
         case .git: return "arrow.down.circle"
@@ -63,6 +76,8 @@ private struct DevToolsData: Codable {
     var timer = TimerSettings()
     var codeFolder: String?
     var cloneFolder: String?
+    var codeRemote: RemoteSource?
+    var codeNotes: [CodeNote] = []
 
     init() {}
 
@@ -74,6 +89,8 @@ private struct DevToolsData: Codable {
         timer = try values.decodeIfPresent(TimerSettings.self, forKey: .timer) ?? TimerSettings()
         codeFolder = try values.decodeIfPresent(String.self, forKey: .codeFolder)
         cloneFolder = try values.decodeIfPresent(String.self, forKey: .cloneFolder)
+        codeRemote = try values.decodeIfPresent(RemoteSource.self, forKey: .codeRemote)
+        codeNotes = try values.decodeIfPresent([CodeNote].self, forKey: .codeNotes) ?? []
     }
 }
 
@@ -87,6 +104,8 @@ final class DevToolsStore: ObservableObject {
     @Published var timer = TimerSettings() { didSet { save() } }
     @Published var codeFolder: String? { didSet { save() } }
     @Published var cloneFolder: String? { didSet { save() } }
+    @Published var codeRemote: RemoteSource? { didSet { save() } }
+    @Published var codeNotes: [CodeNote] = [] { didSet { save() } }
 
     private let fileURL: URL
     private var isLoading = true
@@ -101,6 +120,8 @@ final class DevToolsStore: ObservableObject {
             timer = saved.timer
             codeFolder = saved.codeFolder
             cloneFolder = saved.cloneFolder
+            codeRemote = saved.codeRemote
+            codeNotes = saved.codeNotes
         }
         isLoading = false
     }
@@ -114,6 +135,8 @@ final class DevToolsStore: ObservableObject {
         data.timer = timer
         data.codeFolder = codeFolder
         data.cloneFolder = cloneFolder
+        data.codeRemote = codeRemote
+        data.codeNotes = codeNotes
         do {
             try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONEncoder.twinee.encode(data).write(to: fileURL, options: .atomic)
@@ -125,8 +148,19 @@ final class DevToolsStore: ObservableObject {
 
 extension WorkspaceStore {
     func openApp(_ app: DevApp) {
+        whiteboardProjectID = nil
         todoScope = nil
         selectedTopicID = nil
         activeApp = app
+    }
+}
+
+extension WorkspaceStore {
+    func openWhiteboard(for projectID: UUID) {
+        todoScope = nil
+        selectedTopicID = nil
+        selectedProjectID = projectID
+        whiteboardProjectID = projectID
+        activeApp = .whiteboard
     }
 }

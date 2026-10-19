@@ -68,6 +68,8 @@ extension WorkspaceStore {
         topics.removeAll { $0.projectID == id }
         todos.removeAll { $0.projectID == id }
         projects.removeAll { $0.id == id }
+        WhiteboardStore.shared.remove(key: id.uuidString)
+        if whiteboardProjectID == id { whiteboardProjectID = nil; activeApp = nil }
 
         let topicRemoved = selectedTopicID.map { selected in !topics.contains { $0.id == selected } } ?? false
         var scopeRemoved = false
@@ -388,6 +390,6 @@ private struct TodoNotes: View {
 
 enum ProjectPalette {
     static func color(_ index: Int) -> Color {
-        [Color(hex: 0x8170D8), Color(hex: 0xD48C60), Color(hex: 0x5B9D83), Color(hex: 0x638FC8), Color(hex: 0xCF7892)][index % 5]
+        [Color(hex: 0x7C5CFF), Color(hex: 0xFF8A3D), Color(hex: 0x1FB57A), Color(hex: 0x2F8CFF), Color(hex: 0xFF4F8B)][index % 5]
     }
 }

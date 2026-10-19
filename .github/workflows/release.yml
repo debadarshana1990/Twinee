@@ -31,4 +31,4 @@ jobs:
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/*.zip --title "Twinee $GITHUB_REF_NAME Release Candidate" --generate-notes --prerelease
+        run: gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/*.zip --title "Twinee ${GITHUB_REF_NAME#v}" --notes-file RELEASE_NOTES.md
